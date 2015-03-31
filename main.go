@@ -15,10 +15,14 @@ import (
 
 func newNonce() ([24]byte, error) {
 	var nonce [24]byte
-	_, err := rand.Read(nonce[:])
+	n, err := rand.Read(nonce[:])
 
 	if err != nil {
 		return nonce, err
+	}
+
+	if n != 24 {
+		return nonce, errors.New("Not enough bytes read for nonce")
 	}
 
 	return nonce, nil
