@@ -222,7 +222,7 @@ func main() {
 	if _, err := conn.Write([]byte(os.Args[2])); err != nil {
 		log.Fatal(err)
 	}
-	buf := make([]byte, len(os.Args[2]))
+	buf := make([]byte, 2048)
 	n, err := conn.Read(buf)
 	if err != nil {
 		log.Fatal(err)
