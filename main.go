@@ -13,15 +13,18 @@ import (
 	"golang.org/x/crypto/nacl/box"
 )
 
-func newNonce() ([24]byte, error) {
-	var nonce [24]byte
+const NonceSize = 24
+const KeySize = 32
+
+func newNonce() ([NonceSize]byte, error) {
+	var nonce [NonceSize]byte
 	n, err := rand.Read(nonce[:])
 
 	if err != nil {
 		return nonce, err
 	}
 
-	if n != 24 {
+	if n != NonceSize {
 		return nonce, errors.New("Not enough bytes read for nonce")
 	}
 
@@ -30,7 +33,7 @@ func newNonce() ([24]byte, error) {
 
 type secureReader struct {
 	wrappedReader io.Reader
-	priv, pub     *[32]byte
+	priv, pub     *[KeySize]byte
 }
 
 // decrypt
@@ -42,13 +45,17 @@ func (r secureReader) Read(p []byte) (int, error) {
 		return n, err
 	}
 
+	if len(encryptedMessage) < (NonceSize + box.Overhead + 1) {
+		return n, errors.New("SecureReader: Read: buffer for Read not large enough to accomodate nonce and message")
+	}
+
 	// strip off the nonce
 	// and any extra space at the end of the buffer
-	nonceSlice := encryptedMessage[:24]
-	encryptedMessage = encryptedMessage[24:n]
+	nonceSlice := encryptedMessage[:NonceSize]
+	encryptedMessage = encryptedMessage[NonceSize:n]
 
 	// convert the slice to an array
-	var nonce [24]byte
+	var nonce [NonceSize]byte
 	copy(nonce[:], nonceSlice)
 
 	decryptedMessage, auth := box.Open(nil, encryptedMessage, &nonce, r.pub, r.priv)
@@ -68,7 +75,7 @@ func (r secureReader) Read(p []byte) (int, error) {
 
 type secureWriter struct {
 	wrappedWriter io.Writer
-	priv, pub     *[32]byte
+	priv, pub     *[KeySize]byte
 }
 
 // encrypt
@@ -89,12 +96,12 @@ func (w secureWriter) Write(p []byte) (int, error) {
 }
 
 // NewSecureReader instantiates a new SecureReader
-func NewSecureReader(r io.Reader, priv, pub *[32]byte) io.Reader {
+func NewSecureReader(r io.Reader, priv, pub *[KeySize]byte) io.Reader {
 	return secureReader{r, priv, pub}
 }
 
 // NewSecureWriter instantiates a new SecureWriter
-func NewSecureWriter(w io.Writer, priv, pub *[32]byte) io.Writer {
+func NewSecureWriter(w io.Writer, priv, pub *[KeySize]byte) io.Writer {
 	return secureWriter{w, priv, pub}
 }
 
@@ -128,7 +135,7 @@ func Dial(addr string) (io.ReadWriteCloser, error) {
 	}
 
 	// wait for the server's public key
-	peerPubSlice := make([]byte, 32)
+	peerPubSlice := make([]byte, KeySize)
 	n, err := conn.Read(peerPubSlice)
 
 	if err != nil {
@@ -136,7 +143,7 @@ func Dial(addr string) (io.ReadWriteCloser, error) {
 	}
 
 	peerPubSlice = peerPubSlice[:n]
-	var peerPub [32]byte
+	var peerPub [KeySize]byte
 	copy(peerPub[:], peerPubSlice)
 
 	secCon := secureConn{
@@ -168,8 +175,9 @@ func Serve(l net.Listener) error {
 }
 
 func handleConnection(c net.Conn, pub, priv *[32]byte) error {
+	defer c.Close()
 	// first wait for the client's public key
-	peerPubSlice := make([]byte, 32)
+	peerPubSlice := make([]byte, KeySize)
 	n, err := c.Read(peerPubSlice)
 
 	if err != nil {
@@ -177,7 +185,7 @@ func handleConnection(c net.Conn, pub, priv *[32]byte) error {
 	}
 
 	peerPubSlice = peerPubSlice[:n]
-	var peerPub [32]byte
+	var peerPub [KeySize]byte
 	copy(peerPub[:], peerPubSlice)
 
 	// then, send our public key
