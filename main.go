@@ -13,7 +13,10 @@ import (
 	"golang.org/x/crypto/nacl/box"
 )
 
+// Size (in bytes) of the nonce for NaCl box seal/open
 const NonceSize = 24
+
+// Size (in bytes) of the key for NaCl box seal/open
 const KeySize = 32
 
 func newNonce() ([NonceSize]byte, error) {
@@ -38,15 +41,14 @@ type secureReader struct {
 
 // decrypt
 func (r secureReader) Read(p []byte) (int, error) {
-	encryptedMessage := make([]byte, len(p))
+	// make a buffer large enough to handle
+	// the overhead associated with an encrypted message
+	// (the tag and nonce)
+	encryptedMessage := make([]byte, (len(p) + NonceSize + box.Overhead))
 	n, err := r.wrappedReader.Read(encryptedMessage)
 
 	if err != nil {
 		return n, err
-	}
-
-	if len(encryptedMessage) < (NonceSize + box.Overhead + 1) {
-		return n, errors.New("SecureReader: Read: buffer for Read not large enough to accomodate nonce and message")
 	}
 
 	// strip off the nonce
@@ -68,9 +70,9 @@ func (r secureReader) Read(p []byte) (int, error) {
 		return 0, errors.New("Decrypt error")
 	}
 
-	bytesWritten := copy(p, decryptedMessage)
+	n = copy(p, decryptedMessage)
 
-	return bytesWritten, nil
+	return n, nil
 }
 
 type secureWriter struct {
@@ -91,6 +93,10 @@ func (w secureWriter) Write(p []byte) (int, error) {
 	encWithNonce := append(nonce[:], encryptedMessage...)
 
 	n, err := w.wrappedWriter.Write(encWithNonce)
+
+	if n < len(encWithNonce) {
+		return n, errors.New("failed to write complete encrypted message")
+	}
 
 	return n, err
 }
@@ -171,17 +177,16 @@ func Serve(l net.Listener) error {
 
 		go handleConnection(conn, pub, priv)
 	}
-	return nil
 }
 
-func handleConnection(c net.Conn, pub, priv *[32]byte) error {
+func handleConnection(c net.Conn, pub, priv *[32]byte) {
 	defer c.Close()
 	// first wait for the client's public key
 	peerPubSlice := make([]byte, KeySize)
 	n, err := c.Read(peerPubSlice)
 
 	if err != nil {
-		return err
+		log.Println(err)
 	}
 
 	peerPubSlice = peerPubSlice[:n]
@@ -192,7 +197,7 @@ func handleConnection(c net.Conn, pub, priv *[32]byte) error {
 	_, err = c.Write(pub[:])
 
 	if err != nil {
-		return err
+		log.Println(err)
 	}
 
 	// now session is "secure"
@@ -202,7 +207,9 @@ func handleConnection(c net.Conn, pub, priv *[32]byte) error {
 	// echo
 	_, err = io.Copy(secureWriter, secureReader)
 
-	return err
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func main() {
@@ -230,7 +237,7 @@ func main() {
 	if _, err := conn.Write([]byte(os.Args[2])); err != nil {
 		log.Fatal(err)
 	}
-	buf := make([]byte, 2048)
+	buf := make([]byte, len(os.Args[2]))
 	n, err := conn.Read(buf)
 	if err != nil {
 		log.Fatal(err)
