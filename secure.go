@@ -35,6 +35,10 @@ func newNonce() ([NonceSize]byte, error) {
 	return nonce, nil
 }
 
+// A Reader is an io.Reader that can be used to read streams
+// of encrypted data that was encrypted using the Writer from this package.
+// The Reader will decrypt and return the plaintext from
+// the provided io.Reader.
 type Reader struct {
 	r         io.Reader
 	priv, pub *[KeySize]byte
@@ -79,13 +83,15 @@ func (s Reader) Read(p []byte) (int, error) {
 	return n, nil
 }
 
+// A Writer is an io.Writer which will encrypt the provided data
+// and write it to the provided wrapped io.Writer
 type Writer struct {
 	w         io.Writer
 	priv, pub *[KeySize]byte
 }
 
-// ReadFrom reads from a reader (assumed to be a SecureReader)
-// and writes to the SecureWriter.
+// ReadFrom reads from a reader (assumed to be a Reader from this package)
+// and writes to the Writer.
 // This implementation is almost identical to the default
 // implementation in io.Copy, but it takes into account
 // that the written (encrypted) message is expected to be larger than
