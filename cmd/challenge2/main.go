@@ -90,6 +90,7 @@ func handleConnection(c net.Conn, pub, priv *[32]byte) {
 
 	if err != nil {
 		log.Println(err)
+		return
 	}
 
 	peerPubSlice = peerPubSlice[:n]
@@ -101,6 +102,7 @@ func handleConnection(c net.Conn, pub, priv *[32]byte) {
 
 	if err != nil {
 		log.Println(err)
+		return
 	}
 
 	// now session is "secure"
