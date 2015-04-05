@@ -9,7 +9,7 @@ import (
 
 func TestSecureEchoServer(t *testing.T) {
 	// Create a random listener
-	l, err := net.Listen("tcp", ":0")
+	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func TestSecureEchoServer(t *testing.T) {
 
 func TestSecureServe(t *testing.T) {
 	// Create a random listener
-	l, err := net.Listen("tcp", ":0")
+	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func TestSecureServe(t *testing.T) {
 
 func TestSecureDial(t *testing.T) {
 	// Create a random listener
-	l, err := net.Listen("tcp", ":0")
+	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}

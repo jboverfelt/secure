@@ -11,12 +11,14 @@ func TestReadWriterPing(t *testing.T) {
 	priv, pub := &[32]byte{'p', 'r', 'i', 'v'}, &[32]byte{'p', 'u', 'b'}
 
 	r, w := io.Pipe()
-	defer w.Close()
 	secureR := NewReader(r, priv, pub)
 	secureW := NewWriter(w, priv, pub)
 
 	// Encrypt hello world
-	go fmt.Fprintf(secureW, "hello world\n")
+	go func() {
+		fmt.Fprintf(secureW, "hello world\n")
+		w.Close()
+	}()
 
 	// Decrypt message
 	buf := make([]byte, 1024)
