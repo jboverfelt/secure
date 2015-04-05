@@ -4,6 +4,14 @@ Securing data transmission using NaCl.
 
 More information [here](http://golang-challenge.com/go-challenge2/)
 
+## Prerequisites
+
+Install Go's NaCl library:
+
+```
+go get -u golang.org/x/crypto/nacl/box
+```
+
 ## Installation/Usage
 
 Please place the files in this directory in ``$GOPATH/src/bitbucket.org/jboverfelt/secure``
