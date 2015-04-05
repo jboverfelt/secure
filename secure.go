@@ -20,6 +20,16 @@ const TotalOverhead = NonceSize + box.Overhead
 // Size (in bytes) of the max message size supported by this package
 const MaxMessageSize = 32 * 1024
 
+// ErrNonceSize means that the source of randomness did not provide
+// enough bytes for a complete nonce
+var ErrNonceSize = errors.New("not enough bytes read for nonce")
+
+// ErrDecrypt means that there was a problem during decryption
+var ErrDecrypt = errors.New("decrypt error")
+
+// ErrEncWrite means that a complete encrypted message was unable to be written
+var ErrEncWrite = errors.New("failed to write complete encrypted message")
+
 func newNonce() ([NonceSize]byte, error) {
 	var nonce [NonceSize]byte
 	n, err := rand.Read(nonce[:])
@@ -29,7 +39,7 @@ func newNonce() ([NonceSize]byte, error) {
 	}
 
 	if n != NonceSize {
-		return nonce, errors.New("not enough bytes read for nonce")
+		return nonce, ErrNonceSize
 	}
 
 	return nonce, nil
@@ -71,11 +81,11 @@ func (s Reader) Read(p []byte) (int, error) {
 	decrypt, auth := box.Open(nil, enc, &nonce, s.pub, s.priv)
 	// if authentication failed, output bottom
 	if !auth {
-		return 0, errors.New("decrypt error")
+		return 0, ErrDecrypt
 	}
 
 	if len(decrypt) > len(p) {
-		return 0, errors.New("decrypt error")
+		return 0, ErrDecrypt
 	}
 
 	n = copy(p, decrypt)
@@ -148,7 +158,7 @@ func (s Writer) Write(p []byte) (int, error) {
 	// an error if n < len(p) since len(encWithNonce) is guaranteed
 	// to be greater than len(p)
 	if n < len(encWithNonce) {
-		return n, errors.New("failed to write complete encrypted message")
+		return n, ErrEncWrite
 	}
 
 	return n, err
