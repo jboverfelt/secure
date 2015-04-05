@@ -23,7 +23,7 @@ type secureConn struct {
 // Dial generates a private/public key pair,
 // connects to the server, perform the handshake
 // and return a reader/writer.
-func Dial(addr string) (io.ReadWriteCloser, error) {
+func dial(addr string) (io.ReadWriteCloser, error) {
 	pub, priv, err := box.GenerateKey(rand.Reader)
 
 	if err != nil {
@@ -65,7 +65,7 @@ func Dial(addr string) (io.ReadWriteCloser, error) {
 }
 
 // Serve starts a secure echo server on the given listener.
-func Serve(l net.Listener) error {
+func serve(l net.Listener) error {
 	pub, priv, err := box.GenerateKey(rand.Reader)
 
 	if err != nil {
@@ -128,14 +128,14 @@ func main() {
 			log.Fatal(err)
 		}
 		defer l.Close()
-		log.Fatal(Serve(l))
+		log.Fatal(serve(l))
 	}
 
 	// Client mode
 	if len(os.Args) != 3 {
 		log.Fatalf("Usage: %s <port> <message>", os.Args[0])
 	}
-	conn, err := Dial("localhost:" + os.Args[1])
+	conn, err := dial("localhost:" + os.Args[1])
 	if err != nil {
 		log.Fatal(err)
 	}

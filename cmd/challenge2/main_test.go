@@ -16,9 +16,9 @@ func TestSecureEchoServer(t *testing.T) {
 	defer l.Close()
 
 	// Start the server
-	go Serve(l)
+	go serve(l)
 
-	conn, err := Dial(l.Addr().String())
+	conn, err := dial(l.Addr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestSecureServe(t *testing.T) {
 	defer l.Close()
 
 	// Start the server
-	go Serve(l)
+	go serve(l)
 
 	conn, err := net.Dial("tcp", l.Addr().String())
 	if err != nil {
@@ -100,7 +100,7 @@ func TestSecureDial(t *testing.T) {
 		}
 	}(l)
 
-	conn, err := Dial(l.Addr().String())
+	conn, err := dial(l.Addr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
