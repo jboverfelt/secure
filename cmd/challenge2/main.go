@@ -11,7 +11,7 @@ import (
 
 	"golang.org/x/crypto/nacl/box"
 
-	"bitbucket.org/jboverfelt/secure"
+	"github.com/jboverfelt/secure"
 )
 
 type secureConn struct {
