@@ -44,16 +44,12 @@ func dial(addr string) (io.ReadWriteCloser, error) {
 	}
 
 	// wait for the server's public key
-	peerPubSlice := make([]byte, secure.KeySize)
-	n, err := conn.Read(peerPubSlice)
+	var peerPub [secure.KeySize]byte
+	_, err = io.ReadFull(conn, peerPub[:])
 
 	if err != nil {
 		return nil, err
 	}
-
-	peerPubSlice = peerPubSlice[:n]
-	var peerPub [secure.KeySize]byte
-	copy(peerPub[:], peerPubSlice)
 
 	secCon := secureConn{
 		secure.NewReader(conn, priv, &peerPub),
@@ -83,22 +79,18 @@ func serve(l net.Listener) error {
 }
 
 func handleConnection(c net.Conn, pub, priv *[32]byte) {
-	defer c.Close()
-	// first wait for the client's public key
-	peerPubSlice := make([]byte, secure.KeySize)
-	n, err := c.Read(peerPubSlice)
+	// send our public key
+	_, err := c.Write(pub[:])
 
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	peerPubSlice = peerPubSlice[:n]
+	defer c.Close()
+	// wait for the client's public key
 	var peerPub [secure.KeySize]byte
-	copy(peerPub[:], peerPubSlice)
-
-	// then, send our public key
-	_, err = c.Write(pub[:])
+	_, err = io.ReadFull(c, peerPub[:])
 
 	if err != nil {
 		log.Println(err)
@@ -110,10 +102,17 @@ func handleConnection(c net.Conn, pub, priv *[32]byte) {
 	sw := secure.NewWriter(c, priv, &peerPub)
 
 	// echo
-	_, err = io.Copy(sw, sr)
-
+	var buf [secure.MaxMessageSize]byte
+	n, err := sr.Read(buf[:])
+	fmt.Println("after read in serve")
 	if err != nil {
-		log.Println(err)
+		log.Printf("Serve: cant read message: " + err.Error())
+		return
+	}
+	// write back message
+	if _, err := sw.Write(buf[:n]); err != nil {
+		log.Printf("Serve: cant write message: " + err.Error())
+		return
 	}
 }
 
