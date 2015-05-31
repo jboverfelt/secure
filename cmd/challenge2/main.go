@@ -104,7 +104,6 @@ func handleConnection(c net.Conn, pub, priv *[32]byte) {
 	// echo
 	var buf [secure.MaxMessageSize]byte
 	n, err := sr.Read(buf[:])
-	fmt.Println("after read in serve")
 	if err != nil {
 		log.Printf("Serve: cant read message: " + err.Error())
 		return
