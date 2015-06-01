@@ -4,6 +4,9 @@ Securing data transmission using NaCl.
 
 More information [here](http://golang-challenge.com/go-challenge2/)
 
+*Note:* This is an updated version based on evaluator feedback. The original is
+[here](https://github.com/golangchallenge/GCSolutions/tree/master/april15/normal/justin-overfelt/jboverfelt-secure-f96ca7e9bc9a)
+
 ## Installation/Usage
 
 ``go get -u github.com/jboverfelt/secure``
