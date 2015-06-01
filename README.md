@@ -1,4 +1,4 @@
-# Go Challenge 2 [![Build Status](https://travis-ci.org/jboverfelt/secure.svg?branch=master)](https://travis-ci.org/jboverfelt/secure)
+# Go Challenge 2 [![Build Status](https://travis-ci.org/jboverfelt/secure.svg?branch=master)](https://travis-ci.org/jboverfelt/secure) [![GoDoc](https://godoc.org/github.com/jboverfelt/secure?status.svg)](https://godoc.org/github.com/jboverfelt/secure)
 
 Securing data transmission using NaCl.
 

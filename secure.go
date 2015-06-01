@@ -116,7 +116,7 @@ func (s Writer) Write(p []byte) (int, error) {
 
 // NewReader instantiates a new secure Reader
 // priv and pub should be keys generated with box.GenerateKey
-func NewReader(r io.Reader, priv, pub *[KeySize]byte) io.Reader {
+func NewReader(r io.Reader, priv, pub *[KeySize]byte) Reader {
 	sr := Reader{r: r, priv: priv, pub: pub}
 	box.Precompute(&sr.shared, pub, priv)
 	return sr
@@ -124,7 +124,7 @@ func NewReader(r io.Reader, priv, pub *[KeySize]byte) io.Reader {
 
 // NewWriter instantiates a new secure Writer
 // priv and pub should be keys generated with box.GenerateKey
-func NewWriter(w io.Writer, priv, pub *[KeySize]byte) io.Writer {
+func NewWriter(w io.Writer, priv, pub *[KeySize]byte) Writer {
 	sw := Writer{w: w, priv: priv, pub: pub}
 	box.Precompute(&sw.shared, pub, priv)
 	return sw
