@@ -36,16 +36,16 @@ func dial(addr string) (io.ReadWriteCloser, error) {
 		return nil, err
 	}
 
-	// first thing we do is send our public key
-	_, err = conn.Write(pub[:])
+	// wait for the server's public key
+	var peerPub [secure.KeySize]byte
+	_, err = io.ReadFull(conn, peerPub[:])
 
 	if err != nil {
 		return nil, err
 	}
 
-	// wait for the server's public key
-	var peerPub [secure.KeySize]byte
-	_, err = io.ReadFull(conn, peerPub[:])
+	// send our public key
+	_, err = conn.Write(pub[:])
 
 	if err != nil {
 		return nil, err
