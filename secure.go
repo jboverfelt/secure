@@ -2,7 +2,9 @@ package secure
 
 import (
 	"crypto/rand"
+	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 
 	"golang.org/x/crypto/nacl/box"
@@ -13,9 +15,6 @@ const NonceSize = 24
 
 // Size (in bytes) of the key for NaCl box seal/open
 const KeySize = 32
-
-// Size (in bytes) of total additional overhead added by encryption
-const TotalOverhead = NonceSize + box.Overhead
 
 // Size (in bytes) of the max message size supported by this package
 const MaxMessageSize = 32 * 1024
@@ -30,21 +29,6 @@ var ErrDecrypt = errors.New("decrypt error")
 // ErrEncWrite means that a complete encrypted message was unable to be written
 var ErrEncWrite = errors.New("failed to write complete encrypted message")
 
-func newNonce() ([NonceSize]byte, error) {
-	var nonce [NonceSize]byte
-	n, err := rand.Read(nonce[:])
-
-	if err != nil {
-		return nonce, err
-	}
-
-	if n != NonceSize {
-		return nonce, ErrNonceSize
-	}
-
-	return nonce, nil
-}
-
 // A Reader is an io.Reader that can be used to read streams
 // of encrypted data that was encrypted using the Writer from this package.
 // The Reader will decrypt and return the plaintext from
@@ -52,45 +36,46 @@ func newNonce() ([NonceSize]byte, error) {
 type Reader struct {
 	r         io.Reader
 	priv, pub *[KeySize]byte
+	shared    [KeySize]byte
 }
 
 // Read decrypts a stream encrypted with box.Seal.
 // It expects the nonce used to be prepended
 // to the ciphertext
 func (s Reader) Read(p []byte) (int, error) {
-	// make a buffer large enough to handle
-	// the overhead associated with an encrypted message
-	// (the tag and nonce)
-	enc := make([]byte, (len(p) + TotalOverhead))
-	n, err := s.r.Read(enc)
-
-	if err != nil {
-		return n, err
+	// Read the nonce from the stream
+	var nonce [NonceSize]byte
+	if n, err := io.ReadFull(s.r, nonce[:]); err != nil {
+		fmt.Println(err)
+		fmt.Println(n)
+		return 0, errors.New("nonce")
 	}
 
-	// strip off the nonce
-	// and any extra space at the end of the buffer
-	nonceSlice := enc[:NonceSize]
-	enc = enc[NonceSize:n]
+	// Read the ciphertext size
+	var size uint16
+	if err := binary.Read(s.r, binary.LittleEndian, &size); err != nil {
+		return 0, errors.New("size")
+	}
 
-	// convert the slice to an array
-	// for use in box.Open
-	var nonce [NonceSize]byte
-	copy(nonce[:], nonceSlice)
+	// Ensure buffer is large enough for ciphertext
+	if uint16(len(p)) < size-box.Overhead {
+		return 0, errors.New("wrong size")
+	}
 
-	decrypt, auth := box.Open(nil, enc, &nonce, s.pub, s.priv)
+	// make a buffer large enough to handle
+	// the overhead associated with an encrypted message
+	enc := make([]byte, size)
+	if _, err := io.ReadFull(s.r, enc); err != nil {
+		return 0, errors.New("msg")
+	}
+
+	decrypt, auth := box.OpenAfterPrecomputation(p[0:0], enc, &nonce, &s.shared)
 	// if authentication failed, output bottom
 	if !auth {
 		return 0, ErrDecrypt
 	}
 
-	if len(decrypt) > len(p) {
-		return 0, ErrDecrypt
-	}
-
-	n = copy(p, decrypt)
-
-	return n, nil
+	return len(decrypt), nil
 }
 
 // A Writer is an io.Writer which will encrypt the provided data
@@ -98,80 +83,49 @@ func (s Reader) Read(p []byte) (int, error) {
 type Writer struct {
 	w         io.Writer
 	priv, pub *[KeySize]byte
-}
-
-// ReadFrom reads from a reader (assumed to be a Reader from this package)
-// and writes to the Writer.
-// This implementation is almost identical to the default
-// implementation in io.Copy, but it takes into account
-// that the written (encrypted) message is expected to be larger than
-// the read (plaintext) message.
-func (s Writer) ReadFrom(r io.Reader) (int64, error) {
-	buf := make([]byte, (MaxMessageSize + TotalOverhead))
-
-	var n int64
-	var err error
-
-	for {
-		nr, er := r.Read(buf)
-		if nr > 0 {
-			nw, ew := s.Write(buf[:nr])
-			if nw > 0 {
-				n += int64(nw)
-			}
-			if ew != nil {
-				err = ew
-				break
-			}
-			if (nr + TotalOverhead) != nw {
-				err = io.ErrShortWrite
-				break
-			}
-		}
-		if er == io.EOF {
-			break
-		}
-		if er != nil {
-			err = er
-			break
-		}
-	}
-	return n, err
+	shared    [KeySize]byte
 }
 
 // Write encrypts a plaintext stream using box.Seal
 func (s Writer) Write(p []byte) (int, error) {
-	nonce, err := newNonce()
+	var nonce [24]byte
+	if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
+		return 0, errors.New("secureWriter: cant generate random nonce: " + err.Error())
+	}
 
+	// write nonce
+	_, err := s.w.Write(nonce[:])
 	if err != nil {
-		return 0, err
+		return 0, ErrEncWrite
 	}
 
-	enc := box.Seal(nil, p, &nonce, s.pub, s.priv)
-	// tack the nonce onto the encrypted message
-	encWithNonce := append(nonce[:], enc...)
+	enc := box.SealAfterPrecomputation(nil, p, &nonce, &s.shared)
 
-	n, err := s.w.Write(encWithNonce)
-
-	// return an error if the complete message wasn't written
-	// this case also fulfills the contract that Write must return
-	// an error if n < len(p) since len(encWithNonce) is guaranteed
-	// to be greater than len(p)
-	if n < len(encWithNonce) {
-		return n, ErrEncWrite
+	// write ciphertext length
+	if err := binary.Write(s.w, binary.LittleEndian, uint16(len(enc))); err != nil {
+		return 0, ErrEncWrite
 	}
 
-	return n, err
+	// write ciphertext
+	if _, err = s.w.Write(enc); err != nil {
+		return 0, ErrEncWrite
+	}
+
+	return len(p), err
 }
 
 // NewReader instantiates a new secure Reader
 // priv and pub should be keys generated with box.GenerateKey
-func NewReader(r io.Reader, priv, pub *[KeySize]byte) io.Reader {
-	return Reader{r, priv, pub}
+func NewReader(r io.Reader, priv, pub *[KeySize]byte) Reader {
+	sr := Reader{r: r, priv: priv, pub: pub}
+	box.Precompute(&sr.shared, pub, priv)
+	return sr
 }
 
 // NewWriter instantiates a new secure Writer
 // priv and pub should be keys generated with box.GenerateKey
-func NewWriter(w io.Writer, priv, pub *[KeySize]byte) io.Writer {
-	return Writer{w, priv, pub}
+func NewWriter(w io.Writer, priv, pub *[KeySize]byte) Writer {
+	sw := Writer{w: w, priv: priv, pub: pub}
+	box.Precompute(&sw.shared, pub, priv)
+	return sw
 }
