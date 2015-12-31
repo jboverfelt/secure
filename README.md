@@ -9,7 +9,12 @@ More information [here](http://golang-challenge.com/go-challenge2/)
 
 ## Installation/Usage
 
+This package requires Go 1.5 or later, as it uses the vendoring support found in Go 1.5
+If you're using Go 1.6 or later, setting the environment variable as described below is unnecessary.
+
 ``go get -u github.com/jboverfelt/secure``
+
+Then, ensure that the following environment variable is set: GO15VENDOREXPERIMENT=1
 
 To build the included command, change to the cmd/challenge2 directory and run ``go build``
 
