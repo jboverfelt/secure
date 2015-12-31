@@ -48,25 +48,25 @@ func (s Reader) Read(p []byte) (int, error) {
 	if n, err := io.ReadFull(s.r, nonce[:]); err != nil {
 		fmt.Println(err)
 		fmt.Println(n)
-		return 0, errors.New("nonce")
+		return 0, ErrDecrypt
 	}
 
 	// Read the ciphertext size
 	var size uint16
 	if err := binary.Read(s.r, binary.LittleEndian, &size); err != nil {
-		return 0, errors.New("size")
+		return 0, ErrDecrypt
 	}
 
 	// Ensure buffer is large enough for ciphertext
 	if uint16(len(p)) < size-box.Overhead {
-		return 0, errors.New("wrong size")
+		return 0, ErrDecrypt
 	}
 
 	// make a buffer large enough to handle
 	// the overhead associated with an encrypted message
 	enc := make([]byte, size)
 	if _, err := io.ReadFull(s.r, enc); err != nil {
-		return 0, errors.New("msg")
+		return 0, ErrDecrypt
 	}
 
 	decrypt, auth := box.OpenAfterPrecomputation(p[0:0], enc, &nonce, &s.shared)
