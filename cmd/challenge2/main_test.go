@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
+	"io"
 
 	"net"
 	"testing"
@@ -91,14 +93,31 @@ func TestSecureDial(t *testing.T) {
 				c.Write(key[:])
 				// read client's key
 				keyBuf := make([]byte, 32)
-				n, err := c.Read(keyBuf)
+				_, err := io.ReadFull(c, keyBuf)
 				if err != nil {
 					t.Fatal(err)
 				}
 
-				buf := make([]byte, 2048)
-				n, err = c.Read(buf)
-				if got := string(buf[:n]); got == "hello world\n" {
+				// read nonce
+				var nonce [24]byte
+				if _, err := io.ReadFull(c, nonce[:]); err != nil {
+					t.Fatal(err)
+				}
+
+				// Read the ciphertext size
+				var size uint16
+				if err := binary.Read(c, binary.LittleEndian, &size); err != nil {
+					t.Fatal(err)
+				}
+
+				// make a buffer large enough to handle
+				// the overhead associated with an encrypted message
+				enc := make([]byte, size)
+				if _, err := io.ReadFull(c, enc); err != nil {
+					t.Fatal(err)
+				}
+
+				if got := string(enc); got == "hello world\n" {
 					t.Fatal("Unexpected result. Got raw data instead of encrypted")
 				}
 			}(conn)
@@ -112,8 +131,7 @@ func TestSecureDial(t *testing.T) {
 	defer conn.Close()
 
 	expected := "hello world\n"
-	if n, err := fmt.Fprintf(conn, expected); err != nil {
-		fmt.Printf("bytes written: %d\n", n)
+	if _, err := fmt.Fprintf(conn, expected); err != nil {
 		t.Fatal(err)
 	}
 }
