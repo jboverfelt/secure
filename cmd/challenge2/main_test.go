@@ -86,13 +86,18 @@ func TestSecureDial(t *testing.T) {
 			}
 			go func(c net.Conn) {
 				defer c.Close()
+				// write server key
 				key := [32]byte{}
 				c.Write(key[:])
-				buf := make([]byte, 2048)
-				n, err := c.Read(buf)
+				// read client's key
+				keyBuf := make([]byte, 32)
+				n, err := c.Read(keyBuf)
 				if err != nil {
 					t.Fatal(err)
 				}
+
+				buf := make([]byte, 2048)
+				n, err = c.Read(buf)
 				if got := string(buf[:n]); got == "hello world\n" {
 					t.Fatal("Unexpected result. Got raw data instead of encrypted")
 				}
@@ -107,7 +112,8 @@ func TestSecureDial(t *testing.T) {
 	defer conn.Close()
 
 	expected := "hello world\n"
-	if _, err := fmt.Fprintf(conn, expected); err != nil {
+	if n, err := fmt.Fprintf(conn, expected); err != nil {
+		fmt.Printf("bytes written: %d\n", n)
 		t.Fatal(err)
 	}
 }
