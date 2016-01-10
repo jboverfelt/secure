@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
 
 	"golang.org/x/crypto/nacl/box"
@@ -45,9 +44,7 @@ type Reader struct {
 func (s Reader) Read(p []byte) (int, error) {
 	// Read the nonce from the stream
 	var nonce [NonceSize]byte
-	if n, err := io.ReadFull(s.r, nonce[:]); err != nil {
-		fmt.Println(err)
-		fmt.Println(n)
+	if _, err := io.ReadFull(s.r, nonce[:]); err != nil {
 		return 0, ErrDecrypt
 	}
 
